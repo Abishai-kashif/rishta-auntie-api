@@ -1,8 +1,11 @@
 from pydantic import BaseModel
-from agents import TResponseInputItem
+
+class History(BaseModel):
+    role: str
+    content: str
 
 class PromptRequest(BaseModel):
-    history: list[TResponseInputItem] = []
+    history: list[History] = []
 
 class GuardrailOutput(BaseModel):
     """ 

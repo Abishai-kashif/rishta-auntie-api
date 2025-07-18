@@ -1,16 +1,17 @@
 import os
 import json
+from fastapi import FastAPI
 from dotenv import load_dotenv
+from models import PromptRequest
 from agents import (
         Agent, Runner, OpenAIChatCompletionsModel,
-        AsyncOpenAI, function_tool, InputGuardrailTripwireTriggered,
+        AsyncOpenAI, InputGuardrailTripwireTriggered,
         RunConfig
     )
 from openai.types.responses import ResponseTextDeltaEvent
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from models import PromptRequest, GuardrailOutput
-from fastapi import FastAPI
+from tools import get_user_data, send_whatsapp_sms, web_search
 
 load_dotenv()
 app = FastAPI()
@@ -48,26 +49,10 @@ async def auntie_route(req: PromptRequest):
             tracing_disabled=True
         )
 
-        @function_tool
-        def get_user_data(min_age: int) -> list[dict]:
-            "Retrieve user data based on a minimum age"
-            users = [
-                {"name": "Muneeb", "age": 22, "location": "Karachi", "interests": ["reading", "gaming"]},
-                {"name": "Muhammad Ubaid Hussain", "age": 25, "location": "Lahore", "interests": ["coding", "music"]},
-                {"name": "Azan", "age": 19, "location": "Islamabad", "interests": ["sports", "traveling"]},
-            ]
-
-            for user in users:
-                if user["age"] < min_age:
-                    users.remove(user)
-
-            return users
-
-
         agent = Agent(
             name="Rishta Auntie",
             instructions="You’re a kind and helpful auntie who assists people in finding matches. You should only respond to questions related to matchmaking or simple greetings (like ‘hi’), and ignore all other types of queries.",
-            tools=[get_user_data],
+            tools=[get_user_data, send_whatsapp_sms, web_search],
         )
 
         messages = [
@@ -87,14 +72,14 @@ async def auntie_route(req: PromptRequest):
                     yield json.dumps({
                         "type": event.type,
                         "delta": event.data.delta
-                    })
+                    }) + "\n"
+
                 elif (event.type == "run_item_stream_event"):
                     if event.item.type == "tool_call_output_item":
                         yield json.dumps({
                             "type": event.item.type,
                             "tool_result": event.item.output
-                        })
-
+                        }) + "\n"
         
         return StreamingResponse(
                 event_generator(), media_type="application/json",
