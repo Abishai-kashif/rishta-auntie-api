@@ -1,5 +1,6 @@
-from helper import prune_serpapi_response
+from helper import prune_serpapi_response, format_user_profiles
 from agents import function_tool
+from models import UserProfile
 import requests
 import os
 
@@ -25,7 +26,6 @@ def web_search(query: str) -> dict[str, any]:
         url = f'https://serpapi.com/search?q={query}&api_key={serp_api_key}'
         response = requests.get(url)
         data = response.json()
-        print("\n\n[ WEB SEARCH ] ===> ", data, " <===\n\n")
         return prune_serpapi_response(data)
     except requests.exceptions.RequestException as e:
         print(f"Web search failed: {e}")
@@ -35,34 +35,37 @@ def web_search(query: str) -> dict[str, any]:
         return {"error": "An error occurred during web search."}
 
 @function_tool
-def send_whatsapp_sms(number: str, message: str) -> str:
+def send_whatsapp_sms(number: str, users: list[UserProfile]) -> str:
     """
-    Sends a WhatsApp message to a specified phone number.
-    This tool should be used when the user explicitly requests to send a message
-    via WhatsApp. Always confirm the recipient's phone number.
+    Sends a WhatsApp message to the specified number using a list of user profiles.
+    The function formats the message itself via internal utility, no user message input needed.
 
     Args:
-        number (str): The recipient's phone number, including the country code (e.g., "+92 317 2648144").
-                      Must be a string of digits.
-        message (str): The text message content to be sent (e.g details of the match)
+        number (str): Recipient phone number, including country code (e.g., "+92...").
+        users (list[dict]): List of user profiles (name, age, location, interests).
 
     Returns:
-        str: A confirmation message indicating success or failure of the message delivery,
-             including any error details from the WhatsApp API.
+        str: Confirmation or error from WhatsApp sending.
     """
+    # internally format users to message text
+    message = format_user_profiles(users)
 
-    utlramsg_token = os.getenv('ULTRA_MSG_TOKEN')
-    instance_id = os.getenv('ULTRA_MSG_INSTANCE_ID')
+    try:
+        utlramsg_token = os.getenv('ULTRA_MSG_TOKEN')
+        instance_id = os.getenv('ULTRA_MSG_INSTANCE_ID')
 
-    url = f"https://api.ultramsg.com/{instance_id}/messages/chat"
-    payload = f"token={utlramsg_token}&to={number}&body={message}"
+        url = f"https://api.ultramsg.com/{instance_id}/messages/chat"
+        payload = f"token={utlramsg_token}&to={number}&body={message}"
 
-    payload = payload.encode('utf8').decode('iso-8859-1')
-    headers = {'content-type': 'application/x-www-form-urlencoded'}
+        payload = payload.encode('utf8').decode('iso-8859-1')
+        headers = {'content-type': 'application/x-www-form-urlencoded'}
 
-    response = requests.request("POST", url, data=payload, headers=headers)
+        response = requests.request("POST", url, data=payload, headers=headers)
 
-    print(response.text)
+        return response.text
+    except Exception as e:
+        print(f"An error occurred during WhatsApp message delivery: {e}")
+        return f"An error occurred during WhatsApp message delivery: {e}"
 
 @function_tool
 def get_user_data(min_age: int) -> list[dict]:

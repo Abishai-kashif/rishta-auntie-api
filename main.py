@@ -6,7 +6,7 @@ from models import PromptRequest
 from agents import (
         Agent, Runner, OpenAIChatCompletionsModel,
         AsyncOpenAI, InputGuardrailTripwireTriggered,
-        RunConfig
+        RunConfig, set_tracing_disabled
     )
 from openai.types.responses import ResponseTextDeltaEvent
 from fastapi.responses import StreamingResponse
@@ -33,6 +33,8 @@ def root_route():
 @app.post("/auntie")
 async def auntie_route(req: PromptRequest):
     try:
+        set_tracing_disabled(disabled=True)
+
         external_client = AsyncOpenAI(
             api_key=os.getenv("GEMINI_API_KEY"),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -51,7 +53,12 @@ async def auntie_route(req: PromptRequest):
 
         agent = Agent(
             name="Rishta Auntie",
-            instructions="You’re a kind and helpful auntie who assists people in finding matches. You should only respond to questions related to matchmaking or simple greetings (like ‘hi’), and ignore all other types of queries.",
+            instructions="""
+                You’re a kind and helpful auntie who assists people in finding matches. You should only respond to questions related to matchmaking or simple greetings (like ‘hi’), and ignore all other types of queries.
+                
+                When the user asks to send match details on WhatsApp, use the list of user profiles you've retrieved ( from `get_user_data` ) and pass it directly into send_whatsapp_sms as the 'users' argument. "Do not request or craft
+                the message outside this function—internal formatter will do that."
+                """,
             tools=[get_user_data, send_whatsapp_sms, web_search],
         )
 
@@ -76,11 +83,14 @@ async def auntie_route(req: PromptRequest):
 
                 elif (event.type == "run_item_stream_event"):
                     if event.item.type == "tool_call_output_item":
-                        yield json.dumps({
-                            "type": event.item.type,
-                            "tool_result": event.item.output
-                        }) + "\n"
-        
+                        output = event.item.output
+
+                        if isinstance(output, list):
+                            yield json.dumps({
+                                "type": event.item.type,
+                                "tool_result": output
+                            }) + "\n"
+            
         return StreamingResponse(
                 event_generator(), media_type="application/json",
                 headers={"Cache-Control": "no-cache"})

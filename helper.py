@@ -1,3 +1,5 @@
+from models import UserProfile
+
 def prune_serpapi_response(raw: dict) -> dict:
     """
     Given a full SerpAPI JSON response, returns a pared-down dict containing:
@@ -37,3 +39,13 @@ def prune_serpapi_response(raw: dict) -> dict:
     pruned["images"] = pruned_images
 
     return pruned
+
+
+def format_user_profiles(users: list[UserProfile]) -> str:
+    """
+    Formats a list of user profiles into a WhatsApp-friendly message.
+    """
+    return "Here are your match details, dear:\n\n" + "\n".join(
+        f"* {u['name']} ({u['age']}, {u['location']}) ~ likes {', '.join(u['interests'])}"
+        for u in users
+    )
