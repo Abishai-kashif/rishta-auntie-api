@@ -3,6 +3,7 @@ import json
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from models import PromptRequest
+from pymongo_get_database import get_database
 from agents import (
         Agent, Runner, OpenAIChatCompletionsModel,
         AsyncOpenAI, InputGuardrailTripwireTriggered,
@@ -29,6 +30,25 @@ def root_route():
     return {
         "message": "Welcome to the Rishta App Agent Backend"
     }
+
+@app.get("/users")
+async def users_route():
+    try:
+        db = get_database()
+        cursor = db["users"].find()
+        users = list(cursor)
+
+        for doc in users:
+            doc["_id"] = str(doc["_id"])
+        return {
+            "users": users
+        }
+    
+    except Exception as e:
+        print(f"Something went wrong while getting users: {e}")
+        return {
+            "error": str(e)
+        }
 
 @app.post("/auntie")
 async def auntie_route(req: PromptRequest):

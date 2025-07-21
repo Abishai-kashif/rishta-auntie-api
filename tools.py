@@ -1,5 +1,6 @@
 from helper import prune_serpapi_response, format_user_profiles
 from agents import function_tool
+from pymongo_get_database import get_database
 from models import UserProfile
 import requests
 import os
@@ -80,14 +81,16 @@ def get_user_data(min_age: int) -> list[dict]:
     Returns:
         list[dict]: A list of dictionaries
     """
-    users = [
-        {"name": "Muneeb", "age": 22, "location": "Karachi", "interests": ["reading", "gaming"]},
-        {"name": "Muhammad Ubaid Hussain", "age": 25, "location": "Lahore", "interests": ["coding", "music"]},
-        {"name": "Azan", "age": 19, "location": "Islamabad", "interests": ["sports", "traveling"]},
-    ]
+    
+    query = {
+        "age": {"$gte": min_age}
+    }
 
-    for user in users:
-        if user["age"] < min_age:
-            users.remove(user)
+    db = get_database()
+    cursor = db["users"].find(query)
+    users = list(cursor)
 
+    for doc in users:
+        doc["_id"] = str(doc["_id"])
+    
     return users
